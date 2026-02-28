@@ -374,15 +374,94 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Посещения -->
         <div x-show="isLoggedIn() && currentTab === 'visits'" x-cloak>
-            <h2 class="text-2xl font-bold text-gray-800 mb-6">
-                <i class="fas fa-calendar-check mr-2"></i>Посещения
-            </h2>
-            <p class="text-gray-500">Раздел в разработке...</p>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">
+                    <i class="fas fa-calendar-check mr-2"></i>Посещения
+                </h2>
+                <button @click="showAddVisitModal = true"
+                        class="bg-gradient-to-r from-purple-600 to-pink-500 text-white px-4 py-2 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-600 transition shadow-md">
+                    <i class="fas fa-plus mr-2"></i>Добавить посещение
+                </button>
+            </div>
+
+            <!-- Фильтры -->
+            <div class="bg-white rounded-xl shadow-md p-4 mb-6">
+                <div class="flex gap-4">
+                    <input type="date" x-model="filterDate" @change="loadVisits()"
+                           class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                    <select x-model="filterClient" @change="loadVisits()"
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                        <option value="">Все клиенты</option>
+                        <template x-for="client in clients" :key="client.id">
+                            <option :value="client.id" x-text="client.full_name"></option>
+                        </template>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Таблица посещений -->
+            <div class="bg-white rounded-xl shadow-md overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gradient-to-r from-purple-500 to-pink-500">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">Клиент</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">Дата и время</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">Занятие</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">Тренер</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">Зал</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">Тип</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <template x-for="visit in visits" :key="visit.id">
+                                <tr class="hover:bg-gray-50 transition">
+                                    <td class="px-4 py-3 text-sm font-medium text-gray-900">
+                                        <span x-text="getClientName(visit.client_id)"></span>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm text-gray-900">
+                                        <span x-text="formatDateTime(visit.visit_date)"></span>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm text-gray-900" x-text="visit.class_name || '—'"></td>
+                                    <td class="px-4 py-3 text-sm text-gray-500" x-text="visit.trainer || '—'"></td>
+                                    <td class="px-4 py-3 text-sm text-gray-500" x-text="visit.hall || '—'"></td>
+                                    <td class="px-4 py-3 text-sm">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                              :class="{
+                                                  'bg-blue-100 text-blue-800': visit.visit_type === 'group',
+                                                  'bg-purple-100 text-purple-800': visit.visit_type === 'individual',
+                                                  'bg-green-100 text-green-800': visit.visit_type === 'trial'
+                                              }"
+                                              x-text="getVisitTypeText(visit.visit_type)">
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm">
+                                        <button @click="deleteVisit(visit.id)"
+                                                class="text-red-600 hover:text-red-800"
+                                                title="Удалить">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                        <tbody x-show="visits.length === 0">
+                            <tr>
+                                <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                                    <i class="fas fa-calendar-times text-3xl mb-2"></i>
+                                    <p>Посещений пока нет</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
-        
+
     </main>
     
     <!-- Модальное окно входа -->
@@ -547,6 +626,94 @@
         </div>
     </div>
 
+    <!-- Модальное окно добавления посещения -->
+    <div x-show="showAddVisitModal" x-cloak
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+         @click.self="showAddVisitModal = false;">
+        <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                <i class="fas fa-calendar-check mr-2"></i>Добавить посещение
+            </h2>
+
+            <form @submit.prevent="saveVisit()">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-medium mb-2">Клиент *</label>
+                    <select x-model="visitForm.client_id" required
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                        <option value="">Выберите клиента</option>
+                        <template x-for="client in clients" :key="client.id">
+                            <option :value="client.id" x-text="client.full_name"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-medium mb-2">Абонемент</label>
+                    <select x-model="visitForm.subscription_id"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                        <option value="">Без абонемента</option>
+                        <template x-for="sub in activeSubscriptions" :key="sub.id">
+                            <option :value="sub.id" x-text="sub.name + ' (' + sub.visits_left + ' ост.)'"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-medium mb-2">Дата и время *</label>
+                    <input type="datetime-local" x-model="visitForm.visit_date" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-medium mb-2">Тип посещения *</label>
+                    <select x-model="visitForm.visit_type" required
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                        <option value="group">Групповое занятие</option>
+                        <option value="individual">Индивидуальное занятие</option>
+                        <option value="trial">Пробное занятие</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-gray-700 text-sm font-medium mb-2">Занятие</label>
+                        <input type="text" x-model="visitForm.class_name" placeholder="Например: Zumba Classic"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-medium mb-2">Тренер</label>
+                        <input type="text" x-model="visitForm.trainer" placeholder="Имя тренера"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-medium mb-2">Зал</label>
+                    <input type="text" x-model="visitForm.hall" placeholder="Например: Большой зал"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-medium mb-2">Комментарий</label>
+                    <textarea x-model="visitForm.comment" rows="2"
+                              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"></textarea>
+                </div>
+
+                <div class="flex gap-3">
+                    <button type="submit"
+                            class="flex-1 bg-gradient-to-r from-purple-600 to-pink-500 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-600 transition">
+                        <span x-show="!loading">Добавить</span>
+                        <span x-show="loading"><i class="fas fa-spinner fa-spin"></i> Сохранение...</span>
+                    </button>
+                    <button type="button" @click="showAddVisitModal = false;"
+                            class="px-6 py-3 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition">
+                        Отмена
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         function crmApp() {
             return {
@@ -593,6 +760,22 @@
                     template: '',
                     comment: ''
                 },
+                activeSubscriptions: [],
+
+                // Посещения
+                visits: [],
+                filterDate: '',
+                visitForm: {
+                    client_id: '',
+                    subscription_id: '',
+                    visit_date: '',
+                    visit_type: 'group',
+                    class_name: '',
+                    trainer: '',
+                    hall: '',
+                    comment: ''
+                },
+                showAddVisitModal: false,
 
                 // Статистика
                 stats: {
@@ -664,6 +847,8 @@
                     this.clients = [];
                     this.subscriptions = [];
                     this.subscriptionTemplates = [];
+                    this.visits = [];
+                    this.activeSubscriptions = [];
                     this.stats = { totalClients: 0, activeClients: 0, visitsToday: 0, activeSubscriptions: 0 };
                     this.todayVisits = [];
                     this.showLoginModal = true;
@@ -693,9 +878,11 @@
                         this.loadStats(),
                         this.loadTodayVisits(),
                         this.loadClients(),
-                        this.loadSubscriptionTemplates()
+                        this.loadSubscriptionTemplates(),
+                        this.loadActiveSubscriptions()
                     ]);
                     await this.loadSubscriptions();
+                    await this.loadVisits();
                 },
                 
                 async loadStats() {
@@ -1040,6 +1227,145 @@
                         }
                     } catch (e) {
                         console.error('Error archiving subscription:', e);
+                        alert('Ошибка подключения к серверу');
+                    }
+                },
+
+                // === Посещения ===
+
+                async loadVisits() {
+                    try {
+                        let url = '/api/visits/?limit=500';
+                        if (this.filterDate) {
+                            url += `&date=${this.filterDate}`;
+                        }
+                        if (this.filterClient) {
+                            url += `&client_id=${this.filterClient}`;
+                        }
+
+                        const response = await fetch(url, {
+                            headers: {
+                                'Authorization': `Bearer ${this.accessToken}`
+                            }
+                        });
+
+                        if (response.ok) {
+                            this.visits = await response.json();
+                        }
+                    } catch (e) {
+                        console.error('Error loading visits:', e);
+                    }
+                },
+
+                async loadActiveSubscriptions() {
+                    try {
+                        const response = await fetch('/api/subscriptions/?status_filter=active', {
+                            headers: {
+                                'Authorization': `Bearer ${this.accessToken}`
+                            }
+                        });
+
+                        if (response.ok) {
+                            this.activeSubscriptions = await response.json();
+                        }
+                    } catch (e) {
+                        console.error('Error loading active subscriptions:', e);
+                    }
+                },
+
+                getVisitTypeText(type) {
+                    const texts = {
+                        'group': 'Групповое',
+                        'individual': 'Индивидуальное',
+                        'trial': 'Пробное'
+                    };
+                    return texts[type] || type;
+                },
+
+                formatDateTime(dateString) {
+                    if (!dateString) return '—';
+                    const date = new Date(dateString);
+                    return date.toLocaleDateString('ru-RU', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                },
+
+                async saveVisit() {
+                    this.loading = true;
+
+                    try {
+                        const body = {
+                            client_id: parseInt(this.visitForm.client_id),
+                            visit_date: this.visitForm.visit_date,
+                            visit_type: this.visitForm.visit_type,
+                            class_name: this.visitForm.class_name || null,
+                            trainer: this.visitForm.trainer || null,
+                            hall: this.visitForm.hall || null,
+                            comment: this.visitForm.comment || null
+                        };
+
+                        if (this.visitForm.subscription_id) {
+                            body.subscription_id = parseInt(this.visitForm.subscription_id);
+                        }
+
+                        const response = await fetch('/api/visits/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${this.accessToken}`
+                            },
+                            body: JSON.stringify(body)
+                        });
+
+                        if (response.ok) {
+                            await this.loadVisits();
+                            this.showAddVisitModal = false;
+                            this.visitForm = {
+                                client_id: '',
+                                subscription_id: '',
+                                visit_date: '',
+                                visit_type: 'group',
+                                class_name: '',
+                                trainer: '',
+                                hall: '',
+                                comment: ''
+                            };
+                            await this.loadActiveSubscriptions();
+                        } else {
+                            const error = await response.json();
+                            alert(error.detail || 'Ошибка сохранения');
+                        }
+                    } catch (e) {
+                        console.error('Error saving visit:', e);
+                        alert('Ошибка подключения к серверу');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async deleteVisit(visitId) {
+                    if (!confirm('Удалить это посещение?')) return;
+
+                    try {
+                        const response = await fetch(`/api/visits/${visitId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Authorization': `Bearer ${this.accessToken}`
+                            }
+                        });
+
+                        if (response.ok || response.status === 204) {
+                            await this.loadVisits();
+                        } else {
+                            const error = await response.json();
+                            alert(error.detail || 'Ошибка удаления');
+                        }
+                    } catch (e) {
+                        console.error('Error deleting visit:', e);
                         alert('Ошибка подключения к серверу');
                     }
                 }
