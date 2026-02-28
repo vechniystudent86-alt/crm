@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zumba CRM - Дашборд</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.13.3/dist/cdn.min.js"></script>
+    
+    <!-- Иконки -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        [x-cloak] { display: none !important; }
+        .htmx-indicator { display: none; }
+        .htmx-request .htmx-indicator { display: inline-block; }
+        .htmx-request.htmx-indicator { display: inline-block; }
+    </style>
+</head>
+<body class="bg-gray-100" x-data="crmApp()">
+    
+    <!-- Навигация -->
+    <nav class="bg-gradient-to-r from-purple-600 to-pink-500 shadow-lg" x-show="!isLoggedIn()" x-cloak>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <span class="text-white text-xl font-bold">
+                        <i class="fas fa-dance mr-2"></i>Zumba CRM
+                    </span>
+                </div>
+                <div>
+                    <button @click="showLoginModal = true" 
+                            class="bg-white text-purple-600 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition">
+                        Войти
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Навигация (авторизована) -->
+    <nav class="bg-gradient-to-r from-purple-600 to-pink-500 shadow-lg" x-show="isLoggedIn()" x-cloak>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-8">
+                    <span class="text-white text-xl font-bold">
+                        <i class="fas fa-dance mr-2"></i>Zumba CRM
+                    </span>
+                    <div class="flex space-x-4">
+                        <a href="#" @click.prevent="currentTab = 'dashboard'" 
+                           :class="currentTab === 'dashboard' ? 'bg-purple-700' : 'hover:bg-purple-700'"
+                           class="text-white px-3 py-2 rounded-md text-sm font-medium transition">
+                            <i class="fas fa-home mr-1"></i> Дашборд
+                        </a>
+                        <a href="#" @click.prevent="currentTab = 'clients'" 
+                           :class="currentTab === 'clients' ? 'bg-purple-700' : 'hover:bg-purple-700'"
+                           class="text-white px-3 py-2 rounded-md text-sm font-medium transition">
+                            <i class="fas fa-users mr-1"></i> Клиенты
+                        </a>
+                        <a href="#" @click.prevent="currentTab = 'subscriptions'" 
+                           :class="currentTab === 'subscriptions' ? 'bg-purple-700' : 'hover:bg-purple-700'"
+                           class="text-white px-3 py-2 rounded-md text-sm font-medium transition">
+                            <i class="fas fa-ticket-alt mr-1"></i> Абонементы
+                        </a>
+                        <a href="#" @click.prevent="currentTab = 'visits'" 
+                           :class="currentTab === 'visits' ? 'bg-purple-700' : 'hover:bg-purple-700'"
+                           class="text-white px-3 py-2 rounded-md text-sm font-medium transition">
+                            <i class="fas fa-calendar-check mr-1"></i> Посещения
+                        </a>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-white text-sm" x-text="currentUser?.username"></span>
+                    <button @click="logout()" class="bg-white text-purple-600 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-gray-100 transition">
+                        <i class="fas fa-sign-out-alt mr-1"></i> Выход
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Основной контент -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Сообщение о входе -->
+        <div x-show="!isLoggedIn()" class="text-center py-12" x-cloak>
+            <i class="fas fa-dance text-6xl text-purple-400 mb-4"></i>
+            <h1 class="text-3xl font-bold text-gray-700 mb-2">Добро пожаловать в Zumba CRM!</h1>
+            <p class="text-gray-500 mb-6">Система управления фитнес-студией</p>
+            <button @click="showLoginModal = true" 
+                    class="bg-gradient-to-r from-purple-600 to-pink-500 text-white px-8 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-600 transition shadow-lg">
+                <i class="fas fa-sign-in-alt mr-2"></i> Войти в систему
+            </button>
+        </div>
+        
+        <!-- Дашборд -->
+        <div x-show="isLoggedIn() && currentTab === 'dashboard'" x-cloak>
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                <i class="fas fa-chart-line mr-2"></i>Дашборд
+            </h2>
+            
+            <!-- Статистика -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-purple-500">
+                    <div class="flex items-center">
+                        <div class="flex-1">
+                            <p class="text-sm text-gray-500 uppercase">Всего клиентов</p>
+                            <p class="text-3xl font-bold text-gray-800" x-text="stats.totalClients">0</p>
+                        </div>
+                        <div class="bg-purple-100 p-3 rounded-full">
+                            <i class="fas fa-users text-purple-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-green-500">
+                    <div class="flex items-center">
+                        <div class="flex-1">
+                            <p class="text-sm text-gray-500 uppercase">Активные клиенты</p>
+                            <p class="text-3xl font-bold text-gray-800" x-text="stats.activeClients">0</p>
+                        </div>
+                        <div class="bg-green-100 p-3 rounded-full">
+                            <i class="fas fa-user-check text-green-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-blue-500">
+                    <div class="flex items-center">
+                        <div class="flex-1">
+                            <p class="text-sm text-gray-500 uppercase">Посещений сегодня</p>
+                            <p class="text-3xl font-bold text-gray-800" x-text="stats.visitsToday">0</p>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-full">
+                            <i class="fas fa-calendar-day text-blue-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-pink-500">
+                    <div class="flex items-center">
+                        <div class="flex-1">
+                            <p class="text-sm text-gray-500 uppercase">Активных абонементов</p>
+                            <p class="text-3xl font-bold text-gray-800" x-text="stats.activeSubscriptions">0</p>
+                        </div>
+                        <div class="bg-pink-100 p-3 rounded-full">
+                            <i class="fas fa-ticket-alt text-pink-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Последние посещения -->
+            <div class="bg-white rounded-xl shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">
+                    <i class="fas fa-clock mr-2"></i>Посещения сегодня
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Клиент</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Время</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Занятие</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Тренер</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Зал</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" x-show="todayVisits.length > 0">
+                            <template x-for="visit in todayVisits" :key="visit.id">
+                                <tr>
+                                    <td class="px-4 py-3 text-sm font-medium text-gray-900" x-text="visit.client_name"></td>
+                                    <td class="px-4 py-3 text-sm text-gray-500" x-text="formatTime(visit.visit_date)"></td>
+                                    <td class="px-4 py-3 text-sm text-gray-900" x-text="visit.class_name"></td>
+                                    <td class="px-4 py-3 text-sm text-gray-500" x-text="visit.trainer"></td>
+                                    <td class="px-4 py-3 text-sm text-gray-500" x-text="visit.hall"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                        <tbody x-show="todayVisits.length === 0">
+                            <tr>
+                                <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+                                    <i class="fas fa-calendar-times text-3xl mb-2"></i>
+                                    <p>Посещений сегодня пока нет</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Клиенты -->
+        <div x-show="isLoggedIn() && currentTab === 'clients'" x-cloak>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">
+                    <i class="fas fa-users mr-2"></i>Клиенты
+                </h2>
+                <button @click="showAddClientModal = true" 
+                        class="bg-gradient-to-r from-purple-600 to-pink-500 text-white px-4 py-2 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-600 transition shadow-md">
+                    <i class="fas fa-plus mr-2"></i>Добавить клиента
+                </button>
+            </div>
+            
+            <!-- Поиск -->
+            <div class="bg-white rounded-xl shadow-md p-4 mb-6">
+                <div class="flex gap-4">
+                    <input type="text" x-model="searchQuery" @input.debounce.300ms="searchClients()"
+                           placeholder="Поиск по имени или телефону..."
+                           class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                </div>
+            </div>
+            
+            <!-- Таблица клиентов -->
+            <div class="bg-white rounded-xl shadow-md overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gradient-to-r from-purple-500 to-pink-500">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">ФИО</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">Телефон</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">Telegram</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">WhatsApp</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">Дата регистрации</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <template x-for="client in clients" :key="client.id">
+                                <tr class="hover:bg-gray-50 transition">
+                                    <td class="px-4 py-3 text-sm font-medium text-gray-900" x-text="client.full_name"></td>
+                                    <td class="px-4 py-3 text-sm text-gray-500">
+                                        <a :href="'tel:' + client.phone" class="text-purple-600 hover:text-purple-800" x-text="client.phone"></a>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm text-gray-500">
+                                        <a v-if="client.telegram" :href="'https://t.me/' + client.telegram" target="_blank" class="text-blue-500 hover:text-blue-700">
+                                            <i class="fab fa-telegram"></i>
+                                        </a>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm text-gray-500">
+                                        <a v-if="client.whatsapp" :href="'https://wa.me/' + client.whatsapp" target="_blank" class="text-green-500 hover:text-green-700">
+                                            <i class="fab fa-whatsapp"></i>
+                                        </a>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(client.created_at)"></td>
+                                    <td class="px-4 py-3 text-sm">
+                                        <button @click="editClient(client)" class="text-blue-600 hover:text-blue-800 mr-3">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button @click="deleteClient(client.id)" class="text-red-600 hover:text-red-800">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Абонементы -->
+        <div x-show="isLoggedIn() && currentTab === 'subscriptions'" x-cloak>
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                <i class="fas fa-ticket-alt mr-2"></i>Абонементы
+            </h2>
+            <p class="text-gray-500">Раздел в разработке...</p>
+        </div>
+        
+        <!-- Посещения -->
+        <div x-show="isLoggedIn() && currentTab === 'visits'" x-cloak>
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                <i class="fas fa-calendar-check mr-2"></i>Посещения
+            </h2>
+            <p class="text-gray-500">Раздел в разработке...</p>
+        </div>
+        
+    </main>
+    
+    <!-- Модальное окно входа -->
+    <div x-show="showLoginModal" x-cloak
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+         @click.self="showLoginModal = false">
+        <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md mx-4">
+            <div class="text-center mb-6">
+                <i class="fas fa-dance text-4xl text-purple-600 mb-2"></i>
+                <h2 class="text-2xl font-bold text-gray-800">Вход в систему</h2>
+            </div>
+            
+            <form @submit.prevent="login()">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-medium mb-2">Имя пользователя</label>
+                    <input type="text" x-model="loginForm.username" required
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-medium mb-2">Пароль</label>
+                    <input type="password" x-model="loginForm.password" required
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                </div>
+                
+                <div x-show="loginError" class="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg" x-cloak>
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    <span x-text="loginError"></span>
+                </div>
+                
+                <button type="submit" 
+                        class="w-full bg-gradient-to-r from-purple-600 to-pink-500 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-600 transition">
+                    <span x-show="!loading">Войти</span>
+                    <span x-show="loading"><i class="fas fa-spinner fa-spin"></i> Вход...</span>
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Модальное окно добавления/редактирования клиента -->
+    <div x-show="showAddClientModal || showEditClientModal" x-cloak
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+         @click.self="showAddClientModal = false; showEditClientModal = false;">
+        <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6" x-text="showEditClientModal ? 'Редактировать клиента' : 'Новый клиент'"></h2>
+            
+            <form @submit.prevent="saveClient()">
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-gray-700 text-sm font-medium mb-2">Имя *</label>
+                        <input type="text" x-model="clientForm.first_name" required
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-medium mb-2">Фамилия</label>
+                        <input type="text" x-model="clientForm.last_name"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-medium mb-2">Телефон *</label>
+                    <input type="tel" x-model="clientForm.phone" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-gray-700 text-sm font-medium mb-2">Telegram</label>
+                        <input type="text" x-model="clientForm.telegram" placeholder="@username"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-medium mb-2">WhatsApp</label>
+                        <input type="text" x-model="clientForm.whatsapp" placeholder="+7..."
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-medium mb-2">Email</label>
+                    <input type="email" x-model="clientForm.email"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-medium mb-2">Источник</label>
+                    <select x-model="clientForm.source" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                        <option value="website">Сайт</option>
+                        <option value="telegram">Telegram</option>
+                        <option value="instagram">Instagram</option>
+                        <option value="vk">VK</option>
+                        <option value="recommendation">Рекомендация</option>
+                    </select>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button type="submit" 
+                            class="flex-1 bg-gradient-to-r from-purple-600 to-pink-500 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-600 transition">
+                        <span x-show="!loading">Сохранить</span>
+                        <span x-show="loading"><i class="fas fa-spinner fa-spin"></i> Сохранение...</span>
+                    </button>
+                    <button type="button" @click="showAddClientModal = false; showEditClientModal = false;"
+                            class="px-6 py-3 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition">
+                        Отмена
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        function crmApp() {
+            return {
+                // Состояние
+                accessToken: localStorage.getItem('crm_access_token'),
+                currentUser: null,
+                currentTab: 'dashboard',
+                loading: false,
+                
+                // Модальные окна
+                showLoginModal: false,
+                showAddClientModal: false,
+                showEditClientModal: false,
+                
+                // Форма входа
+                loginForm: {
+                    username: '',
+                    password: ''
+                },
+                loginError: '',
+                
+                // Клиенты
+                clients: [],
+                searchQuery: '',
+                clientForm: {
+                    first_name: '',
+                    last_name: '',
+                    phone: '',
+                    telegram: '',
+                    whatsapp: '',
+                    email: '',
+                    source: 'website'
+                },
+                editingClientId: null,
+                
+                // Статистика
+                stats: {
+                    totalClients: 0,
+                    activeClients: 0,
+                    visitsToday: 0,
+                    activeSubscriptions: 0
+                },
+                
+                // Посещения сегодня
+                todayVisits: [],
+                
+                async init() {
+                    if (this.accessToken) {
+                        await this.fetchCurrentUser();
+                    }
+                    this.showLoginModal = !this.accessToken;
+                },
+                
+                isLoggedIn() {
+                    return !!this.accessToken;
+                },
+                
+                async login() {
+                    this.loading = true;
+                    this.loginError = '';
+                    
+                    try {
+                        const params = new URLSearchParams();
+                        params.append('username', this.loginForm.username);
+                        params.append('password', this.loginForm.password);
+                        
+                        const response = await fetch('/api/auth/login', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            },
+                            body: params
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.accessToken = data.access_token;
+                            localStorage.setItem('crm_access_token', data.access_token);
+                            await this.fetchCurrentUser();
+                            this.showLoginModal = false;
+                            this.loginForm = { username: '', password: '' };
+                            this.loadDashboard();
+                        } else {
+                            const error = await response.json();
+                            this.loginError = error.detail || 'Ошибка входа';
+                        }
+                    } catch (e) {
+                        this.loginError = 'Ошибка подключения к серверу';
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                logout() {
+                    this.accessToken = null;
+                    this.currentUser = null;
+                    localStorage.removeItem('crm_access_token');
+                    this.clients = [];
+                    this.stats = { totalClients: 0, activeClients: 0, visitsToday: 0, activeSubscriptions: 0 };
+                    this.todayVisits = [];
+                    this.showLoginModal = true;
+                },
+                
+                async fetchCurrentUser() {
+                    try {
+                        const response = await fetch('/api/users/me', {
+                            headers: {
+                                'Authorization': `Bearer ${this.accessToken}`
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            this.currentUser = await response.json();
+                            this.loadDashboard();
+                        } else {
+                            this.logout();
+                        }
+                    } catch (e) {
+                        console.error('Error fetching user:', e);
+                    }
+                },
+                
+                async loadDashboard() {
+                    await Promise.all([
+                        this.loadStats(),
+                        this.loadTodayVisits(),
+                        this.loadClients()
+                    ]);
+                },
+                
+                async loadStats() {
+                    try {
+                        const response = await fetch('/api/clients/', {
+                            headers: {
+                                'Authorization': `Bearer ${this.accessToken}`
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            const clients = await response.json();
+                            this.stats.totalClients = clients.length;
+                            this.stats.activeClients = clients.filter(c => c.is_active).length;
+                        }
+                        
+                        // Заглушки для остальных статистик
+                        this.stats.visitsToday = this.todayVisits.length;
+                        this.stats.activeSubscriptions = Math.floor(this.stats.totalClients * 0.6);
+                    } catch (e) {
+                        console.error('Error loading stats:', e);
+                    }
+                },
+                
+                async loadTodayVisits() {
+                    try {
+                        const response = await fetch('/api/visits/today', {
+                            headers: {
+                                'Authorization': `Bearer ${this.accessToken}`
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            this.todayVisits = await response.json();
+                        }
+                    } catch (e) {
+                        console.error('Error loading visits:', e);
+                    }
+                },
+                
+                async loadClients() {
+                    try {
+                        const response = await fetch('/api/clients/', {
+                            headers: {
+                                'Authorization': `Bearer ${this.accessToken}`
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            this.clients = await response.json();
+                        }
+                    } catch (e) {
+                        console.error('Error loading clients:', e);
+                    }
+                },
+                
+                async searchClients() {
+                    if (!this.searchQuery) {
+                        await this.loadClients();
+                        return;
+                    }
+                    
+                    try {
+                        const response = await fetch(`/api/clients/?search=${encodeURIComponent(this.searchQuery)}`, {
+                            headers: {
+                                'Authorization': `Bearer ${this.accessToken}`
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            this.clients = await response.json();
+                        }
+                    } catch (e) {
+                        console.error('Error searching clients:', e);
+                    }
+                },
+                
+                async saveClient() {
+                    this.loading = true;
+                    
+                    try {
+                        const url = this.showEditClientModal 
+                            ? `/api/clients/${this.editingClientId}`
+                            : '/api/clients/';
+                        
+                        const method = this.showEditClientModal ? 'PUT' : 'POST';
+                        
+                        const response = await fetch(url, {
+                            method: method,
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${this.accessToken}`
+                            },
+                            body: JSON.stringify(this.clientForm)
+                        });
+                        
+                        if (response.ok) {
+                            await this.loadClients();
+                            this.showAddClientModal = false;
+                            this.showEditClientModal = false;
+                            this.clientForm = {
+                                first_name: '',
+                                last_name: '',
+                                phone: '',
+                                telegram: '',
+                                whatsapp: '',
+                                email: '',
+                                source: 'website'
+                            };
+                            this.loadStats();
+                        } else {
+                            const error = await response.json();
+                            alert(error.detail || 'Ошибка сохранения');
+                        }
+                    } catch (e) {
+                        console.error('Error saving client:', e);
+                        alert('Ошибка подключения к серверу');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                editClient(client) {
+                    this.clientForm = {
+                        first_name: client.first_name,
+                        last_name: client.last_name || '',
+                        phone: client.phone,
+                        telegram: client.telegram || '',
+                        whatsapp: client.whatsapp || '',
+                        email: client.email || '',
+                        source: client.source || 'website'
+                    };
+                    this.editingClientId = client.id;
+                    this.showEditClientModal = true;
+                },
+                
+                async deleteClient(clientId) {
+                    if (!confirm('Вы уверены, что хотите удалить клиента?')) return;
+                    
+                    try {
+                        const response = await fetch(`/api/clients/${clientId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Authorization': `Bearer ${this.accessToken}`
+                            }
+                        });
+                        
+                        if (response.ok || response.status === 204) {
+                            await this.loadClients();
+                            this.loadStats();
+                        } else {
+                            alert('Ошибка удаления');
+                        }
+                    } catch (e) {
+                        console.error('Error deleting client:', e);
+                        alert('Ошибка подключения к серверу');
+                    }
+                },
+                
+                formatDate(dateString) {
+                    const date = new Date(dateString);
+                    return date.toLocaleDateString('ru-RU', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    });
+                },
+                
+                formatTime(dateString) {
+                    const date = new Date(dateString);
+                    return date.toLocaleTimeString('ru-RU', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                }
+            }
+        }
+        
+        // Инициализация приложения
+        document.addEventListener('alpine:init', () => {
+            const app = crmApp();
+            app.init();
+        });
+    </script>
+</body>
+</html>
