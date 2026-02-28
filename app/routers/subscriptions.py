@@ -11,9 +11,119 @@ from app.database import get_db
 from app.auth import get_current_user
 from app.models import User, Subscription, SubscriptionStatus, Client
 from app.schemas import SubscriptionCreate, SubscriptionUpdate, SubscriptionResponse
-
+from app.services.subscription_templates import get_all_templates, get_template_by_name
 
 router = APIRouter()
+
+
+# ============================================
+# Шаблоны абонементов (должны быть перед {subscription_id})
+# ============================================
+
+@router.get("/templates", response_model=List[dict], summary="Шаблоны абонементов")
+async def get_subscription_templates():
+    """
+    Получение списка стандартных шаблонов абонементов.
+
+    Возвращает предустановленные тарифы:
+    - Пробная тренировка (500₽)
+    - Разовое посещение (750₽)
+    - 4 занятия (2800₽)
+    - 6 занятий (3900₽)
+    - 8 занятий (4800₽)
+    """
+    templates = get_all_templates()
+
+    # Добавляем стоимость за занятие
+    for template in templates:
+        template["price_per_visit"] = round(template["price"] / template["visits_total"], 2)
+
+    return templates
+
+
+@router.get("/templates/{template_name}", response_model=dict, summary="Шаблон по названию")
+async def get_subscription_template(template_name: str):
+    """
+    Получение шаблона по названию.
+
+    Примеры названий:
+    - "Пробная тренировка"
+    - "Разовое посещение"
+    - "4 занятия"
+    - "6 занятий"
+    - "8 занятий"
+    """
+    import urllib.parse
+    decoded_name = urllib.parse.unquote(template_name)
+
+    template = get_template_by_name(decoded_name)
+
+    if not template:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Шаблон '{decoded_name}' не найден"
+        )
+
+    result = template.copy()
+    result["price_per_visit"] = round(result["price"] / result["visits_total"], 2)
+
+    return result
+
+
+@router.post("/from-template", response_model=SubscriptionResponse, status_code=status.HTTP_201_CREATED, summary="Создать абонемент из шаблона")
+async def create_subscription_from_template(
+    template_name: str = Query(..., description="Название шаблона"),
+    client_id: int = Query(..., description="ID клиента"),
+    comment: Optional[str] = Query(None, description="Комментарий к абонементу"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Создание абонемента для клиента на основе шаблона.
+
+    - **template_name**: Название шаблона (например, "8 занятий")
+    - **client_id**: ID клиента
+    - **comment**: Опциональный комментарий
+    """
+    template = get_template_by_name(template_name)
+
+    if not template:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Шаблон '{template_name}' не найден. Доступные: {', '.join([t['name'] for t in get_all_templates()])}"
+        )
+
+    client_result = await db.execute(
+        select(Client).where(Client.id == client_id)
+    )
+    client = client_result.scalar_one_or_none()
+
+    if not client:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Клиент не найден"
+        )
+
+    subscription = Subscription(
+        client_id=client_id,
+        name=template["name"],
+        visits_total=template["visits_total"],
+        visits_left=template["visits_total"],
+        price=template["price"],
+        comment=comment or template.get("description"),
+        status=SubscriptionStatus.ACTIVE
+    )
+
+    if "validity_days" in template:
+        from datetime import timedelta
+        subscription.start_date = datetime.utcnow()
+        subscription.end_date = subscription.start_date + timedelta(days=template["validity_days"])
+
+    db.add(subscription)
+    await db.commit()
+    await db.refresh(subscription)
+
+    return subscription
 
 
 @router.get("/", response_model=List[SubscriptionResponse], summary="Список абонементов")
@@ -234,5 +344,5 @@ async def delete_subscription(
     
     subscription.status = SubscriptionStatus.ARCHIVED
     await db.commit()
-    
+
     return None
