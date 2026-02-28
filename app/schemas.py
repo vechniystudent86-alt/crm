@@ -160,7 +160,7 @@ class ClientWithSubscriptions(ClientResponse):
 class SubscriptionBase(BaseModel):
     name: str = Field(..., max_length=100)
     visits_total: int = Field(..., ge=1)
-    price: Optional[float] = Field(None, ge=0)
+    price: float = Field(..., ge=0)  # Исправлено: price теперь обязательный float
     comment: Optional[str] = None
 
 

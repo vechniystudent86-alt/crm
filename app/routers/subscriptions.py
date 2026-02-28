@@ -82,39 +82,33 @@ async def create_subscription(
 ):
     """
     Создание нового абонемента для клиента.
-    
-    - **client_id**: ID клиента
-    - **name**: Название абонемента (например, "4 занятия")
-    - **visits_total**: Общее количество занятий
-    - **visits_left**: Осталось занятий (по умолчанию = visits_total)
-    - **price**: Цена
-    - **start_date**: Дата начала
-    - **end_date**: Дата окончания
-    - **comment**: Комментарий
     """
     # Проверка существования клиента
     client_result = await db.execute(
         select(Client).where(Client.id == subscription_data.client_id)
     )
     client = client_result.scalar_one_or_none()
-    
+
     if not client:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Клиент не найден"
         )
-    
-    # Создание абонемента
+
+    # Создание абонемента с явным указанием всех полей
     subscription = Subscription(
-        **subscription_data.model_dump(),
-        visits_left=subscription_data.visits_total if subscription_data.visits_left is None else subscription_data.visits_left,
+        client_id=int(subscription_data.client_id),
+        name=str(subscription_data.name),
+        visits_total=int(subscription_data.visits_total),
+        visits_left=int(subscription_data.visits_total),
+        price=float(subscription_data.price) if subscription_data.price else 0.0,
         status=SubscriptionStatus.ACTIVE
     )
-    
+
     db.add(subscription)
     await db.commit()
     await db.refresh(subscription)
-    
+
     return subscription
 
 
